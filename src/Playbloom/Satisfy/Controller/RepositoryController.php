@@ -15,14 +15,25 @@ use Symfony\Component\HttpFoundation\Response;
 
 class RepositoryController extends AbstractProtectedController
 {
+    /** @var Manager */
+    private $manager;
+
+    /** @var LockProcessor */
+    private $lockProcessor;
+
+    public function __construct(Manager $manager, LockProcessor $lockProcessor)
+    {
+        $this->manager = $manager;
+        $this->lockProcessor = $lockProcessor;
+    }
+
     public function indexAction(): Response
     {
         $this->checkAccess();
         $this->checkEnvironment();
 
-        $manager = $this->get(Manager::class);
-        $config = $manager->getConfig();
-        $repositories = $manager->getRepositories();
+        $config = $this->manager->getConfig();
+        $repositories = $this->manager->getRepositories();
         $satisRepository = [
             'type' => 'composer',
             'url' => $config->getHomepage(),
@@ -71,7 +82,7 @@ class RepositoryController extends AbstractProtectedController
         if ($form->isSubmitted() && $form->isValid()) {
             try {
                 $lock = $form->get('file')->getData()->openFile();
-                $this->get(LockProcessor::class)->processFile($lock);
+                $this->lockProcessor->processFile($lock);
 
                 return $this->redirectToRoute('repository');
             } catch (\Exception $e) {
@@ -85,8 +96,7 @@ class RepositoryController extends AbstractProtectedController
     public function editAction(Request $request): Response
     {
         $this->checkAccess();
-        $manager = $this->get(Manager::class);
-        $repository = $manager->findOneRepository($request->attributes->get('repository'));
+        $repository = $this->manager->findOneRepository($request->attributes->get('repository'));
         if (!$repository) {
             return $this->redirectToRoute('repository');
         }
@@ -98,7 +108,7 @@ class RepositoryController extends AbstractProtectedController
         $form->handleRequest($request);
         if ($form->isSubmitted() && $form->isValid()) {
             try {
-                $manager->update($repository, $form->getData());
+                $this->manager->update($repository, $form->getData());
 
                 return $this->redirectToRoute('repository');
             } catch (\Exception $e) {
@@ -112,8 +122,7 @@ class RepositoryController extends AbstractProtectedController
     public function deleteAction(Request $request): Response
     {
         $this->checkAccess();
-        $manager = $this->get(Manager::class);
-        $repository = $manager->findOneRepository($request->attributes->get('repository'));
+        $repository = $this->manager->findOneRepository($request->attributes->get('repository'));
         if (!$repository) {
             return $this->redirectToRoute('repository');
         }
@@ -121,7 +130,7 @@ class RepositoryController extends AbstractProtectedController
         $form = $this->createForm(DeleteFormType::class);
         if (Request::METHOD_DELETE === $request->getMethod()) {
             try {
-                $manager->delete($repository);
+                $this->manager->delete($repository);
 
                 return $this->redirectToRoute('repository');
             } catch (\Exception $e) {
